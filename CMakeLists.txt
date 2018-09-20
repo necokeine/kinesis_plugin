@@ -14,7 +14,7 @@ cmake_minimum_required(VERSION 3.10)
 #  target_include_directories(kinesis_plugin
 #          PUBLIC "include"
 #          )
-  target_include_directories( chain_plugin PUBLIC
+  target_include_directories( kinesis_plugin PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/../../libraries/appbase/include")
 
   target_link_libraries(kinesis_plugin
