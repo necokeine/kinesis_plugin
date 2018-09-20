@@ -40,8 +40,6 @@ using chain::transaction_id_type;
 using chain::packed_transaction;
 
 static appbase::abstract_plugin& _kinesis_plugin = app().register_plugin<kinesis_plugin>();
-
-
 using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
 
     class kinesis_plugin_impl {
@@ -448,7 +446,6 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
     void kinesis_plugin::plugin_initialize(const variables_map &options) {
         char *accept_trx_topic = NULL;
         char *applied_trx_topic = NULL;
-        char *brokers_str = NULL;
 
         try {
             if (0!=my->producer->kinesis_init()){
