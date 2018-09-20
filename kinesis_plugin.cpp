@@ -39,6 +39,11 @@ using chain::signed_block;
 using chain::transaction_id_type;
 using chain::packed_transaction;
 
+enum TransactionType {
+    APPLIED_TRANSACTION = 1,
+    ACCEPTED_TRANSACTION = 2
+};
+
 static appbase::abstract_plugin& _kinesis_plugin = app().register_plugin<kinesis_plugin>();
 using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
 
@@ -373,7 +378,7 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
     void kinesis_plugin_impl::_process_accepted_transaction(const chain::transaction_metadata_ptr &t) {
        //const auto& trx = t->trx;
        //string trx_json = fc::json::to_string( trx );
-       //producer->trx_kinesis_sendmsg(KAFKA_TRX_ACCEPT, (unsigned char*)trx_json.c_str(), trx_json.length());
+       //producer->trx_kinesis_sendmsg(ACCEPTED_TRANSCTION, (unsigned char*)trx_json.c_str(), trx_json.length());
     }
 
     void kinesis_plugin_impl::_process_applied_transaction(const trasaction_info_st &t) {
@@ -381,7 +386,9 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
         string transaction_metadata_json =
             "{\"block_number\":" + std::to_string(t.block_number) + ",\"block_time\":" + std::to_string(time) +
             ",\"trace\":" + fc::json::to_string(t.trace).c_str() + "}";
-       producer->trx_kinesis_sendmsg(KAFKA_TRX_APPLIED, (unsigned char*)transaction_metadata_json.c_str(), trx_json.length());
+       producer->kinesis_sendmsg(APPLIED_TRANSACTION,
+                                 (unsigned char*)transaction_metadata_json.c_str(),
+                                 transaction_metadata_json.length());
 
     }
 
