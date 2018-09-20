@@ -10,7 +10,7 @@ set (CMAKE_CXX_STANDARD 11)
   include_directories("/usr/local/include")
   link_directories("/usr/local/lib")
   add_library( kinesis_plugin
-               kinesis_plugin.cpp kinesis_producer.cpp
+               kinesis_plugin.cpp
                ${HEADERS} )
   target_include_directories(kinesis_plugin
           PUBLIC "include"
