@@ -136,7 +136,6 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
     const std::string kinesis_plugin_impl::actions_col = "actions";
     const std::string kinesis_plugin_impl::accounts_col = "accounts";
 
-
     namespace {
 
         template<typename Queue, typename Entry>
@@ -437,39 +436,45 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
 
     void kinesis_plugin::set_program_options(options_description &cli, options_description &cfg) {
         cfg.add_options()
-                ("accept_trx_topic", bpo::value<std::string>(),
-                 "The topic for accepted transaction.")
-                ("applied_trx_topic", bpo::value<std::string>(),
-                 "The topic for appiled transaction.")
-                ("kafka-uri,k", bpo::value<std::string>(),
-                 "the kafka brokers uri, as 192.168.31.225:9092")
-                ("kafka-queue-size", bpo::value<uint32_t>()->default_value(256),
-                 "The target queue size between nodeos and kafka plugin thread.")
-                ("kafka-block-start", bpo::value<uint32_t>()->default_value(256),
-                 "If specified then only abi data pushed to kafka until specified block is reached.")
+                ("aws-region-name", bpo::value<std::string>(),
+                 "AWS region name in string, e.g. 'ap-northeast-1'")
+                ("aws-stream-name", bpo::value<std::string>(),
+                 "The stream name for AWS kinesis.")
+                ("kinesis-block-start", bpo::value<uint32_t>()->default_value(256),
+                 "If specified then only abi data pushed to kinesis until specified block is reached.")
+
                  ;
     }
 
     void kinesis_plugin::plugin_initialize(const variables_map &options) {
-        char *accept_trx_topic = NULL;
-        char *applied_trx_topic = NULL;
+        string aws_region_name;
+        string aws_stream_name;
 
         try {
-            if (0!=my->producer->kinesis_init()){
+            if (options.count("aws-region-name") != 0) {
+                aws_region_name = options.at("aws-region-name").as<std::string>();
+            } else {
+                aws_region_name = "ap-northeast-1";
+            }
+
+            if (options.count("aws-stream-name") != 0) {
+                aws_stream_name = options.at("aws-stream-name").as<std::string>();
+            } else {
+                aws_stream_name = "EOS_Asia_Kinesis";
+            }
+
+            if (0!=my->producer->kinesis_init(aws_stream_name, aws_region_name)) {
                 elog("kinesis_init fail");
             } else {
                 elog("kinesis_init ok");
             }
-            ilog("initializing kafka_plugin");
+            ilog("initializing kinesis_plugin");
             my->configured = true;
 
-            if( options.count( "kafka-queue-size" )) {
-                my->queue_size = options.at( "kafka-queue-size" ).as<uint32_t>();
+            if ( options.count( "kinesis-block-start" )) {
+                my->start_block_num = options.at( "kinesis-block-start" ).as<uint32_t>();
             }
-            if( options.count( "kafka-block-start" )) {
-                my->start_block_num = options.at( "kafka-block-start" ).as<uint32_t>();
-            }
-            if( my->start_block_num == 0 ) {
+            if ( my->start_block_num == 0 ) {
                 my->start_block_reached = true;
             }
 

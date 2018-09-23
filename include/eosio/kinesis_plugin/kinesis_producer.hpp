@@ -2,6 +2,7 @@
 #define KINESIS_PRODUCER_HPP
 
 #include <aws/core/Aws.h>
+#include <aws/core/utils/HashingUtils.h>
 #include <aws/kinesis/KinesisClient.h>
 #include <aws/kinesis/model/PutRecordRequest.h>
 #include <aws/kinesis/model/PutRecordRequest.h>
@@ -9,18 +10,20 @@
 
 namespace eosio {
 const char *kSTREAM_NAME = "EOS_Asia_Kinesis";
+const char *kREGION_NAME = "ap-northeast-1";
 
 class kinesis_producer {
  public:
   kinesis_producer() {}
 
-  int kinesis_init() {
+  int kinesis_init(const string& stream_name, const string& region_name) {
     // m_options.loggingOptions.logLevel = Aws::Utils::Logging::LogLevel::Info; // Turn on log.
     Aws::InitAPI(m_options);
 
     Aws::Client::ClientConfiguration clientConfig;
     // set your region
-    clientConfig.region = Aws::Region::AP_NORTHEAST_1;
+    clientConfig.region = HashingUtils::HashString(region_name);
+    m_regionName = stream_name;
     m_client = new Aws::Kinesis::KinesisClient(clientConfig);
     return 0;
   }
@@ -28,7 +31,7 @@ class kinesis_producer {
   int kinesis_sendmsg(int trxtype, unsigned char *msgstr, size_t length) {
     // trxtype => to different stream.
     Aws::Kinesis::Model::PutRecordRequest request;
-    request.SetStreamName(kSTREAM_NAME);
+    request.SetStreamName(m_streamName);
     Aws::Utils::ByteBuffer data(msgstr, length);
     request.SetData(data);
 
@@ -48,6 +51,7 @@ class kinesis_producer {
  private:
   Aws::SDKOptions m_options;
   Aws::Kinesis::KinesisClient *m_client;
+  Aws::String m_streamName;
 };
 
 }  // namespace eosio
