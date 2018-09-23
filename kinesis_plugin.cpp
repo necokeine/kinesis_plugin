@@ -208,7 +208,6 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
         }
     }
 
-
     void kinesis_plugin_impl::accepted_block(const chain::block_state_ptr &bs) {
         try {
             queue(mtx, condition, block_state_queue, bs, queue_size);
