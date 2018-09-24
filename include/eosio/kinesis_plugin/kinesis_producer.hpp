@@ -24,8 +24,8 @@ class kinesis_producer {
 
     Aws::Client::ClientConfiguration clientConfig;
     // set your region
-    clientConfig.region = HashingUtils::HashString(region_name);
-    m_regionName = stream_name;
+    clientConfig.region = Aws::Utils::HashingUtils::HashString(region_name.c_str());
+    m_streamName = stream_name.c_str();
     m_client = new Aws::Kinesis::KinesisClient(clientConfig);
     return 0;
   }
