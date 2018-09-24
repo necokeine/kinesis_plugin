@@ -8,6 +8,7 @@
 #include <eosio/chain_plugin/chain_plugin.hpp>
 #include <appbase/application.hpp>
 #include <memory>
+#include <string>
 
 namespace eosio {
 

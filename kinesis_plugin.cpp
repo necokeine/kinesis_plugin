@@ -24,6 +24,7 @@
 #include <boost/thread/condition_variable.hpp>
 
 #include <queue>
+#include <string>
 
 namespace fc { class variant; }
 
@@ -446,8 +447,8 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
     }
 
     void kinesis_plugin::plugin_initialize(const variables_map &options) {
-        string aws_region_name;
-        string aws_stream_name;
+        std::string aws_region_name;
+        std::string aws_stream_name;
 
         try {
             if (options.count("aws-region-name") != 0) {

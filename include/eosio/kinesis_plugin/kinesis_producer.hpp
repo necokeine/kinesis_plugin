@@ -8,6 +8,8 @@
 #include <aws/kinesis/model/PutRecordRequest.h>
 #include <aws/core/utils/Outcome.h>
 
+#include <string>
+
 namespace eosio {
 const char *kSTREAM_NAME = "EOS_Asia_Kinesis";
 const char *kREGION_NAME = "ap-northeast-1";
@@ -16,7 +18,7 @@ class kinesis_producer {
  public:
   kinesis_producer() {}
 
-  int kinesis_init(const string& stream_name, const string& region_name) {
+  int kinesis_init(const std::string& stream_name, const std::string& region_name) {
     // m_options.loggingOptions.logLevel = Aws::Utils::Logging::LogLevel::Info; // Turn on log.
     Aws::InitAPI(m_options);
 
