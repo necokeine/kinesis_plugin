@@ -4,8 +4,9 @@
 #include <aws/core/Aws.h>
 #include <aws/core/utils/HashingUtils.h>
 #include <aws/kinesis/KinesisClient.h>
-#include <aws/kinesis/model/PutRecordRequest.h>
-#include <aws/kinesis/model/PutRecordRequest.h>
+#include <aws/kinesis/model/PutRecordsResult.h>
+#include <aws/kinesis/model/PutRecordsRequest.h>
+#include <aws/kinesis/model/PutRecordsRequestEntry.h>
 #include <aws/core/utils/Outcome.h>
 
 #include <string>
