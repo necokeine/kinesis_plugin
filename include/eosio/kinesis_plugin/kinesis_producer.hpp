@@ -42,14 +42,14 @@ class kinesis_producer {
     putRecordsRequestEntry.SetData(bytes);
     m_putRecordsRequestEntryList.emplace_back(putRecordsRequestEntry);
 
-    if (m_putRecordsRequestEntryList.size > 10) {
+    if (m_putRecordsRequestEntryList.size() > 10) {
       kinesis_commit();
     }
   }
 
   void kinesis_commit() {
-    m_putRecordsRequest.SetData(m_putRecordsRequestEntryList);
-    Aws::Kinesis::Model::PutRecordsOutcome putRecordsResult = m_client.PutRecords(m_putRecordsRequest);
+    m_putRecordsRequest.SetRecords(m_putRecordsRequestEntryList);
+    Aws::Kinesis::Model::PutRecordsOutcome putRecordsResult = m_client->PutRecords(m_putRecordsRequest);
     int retry_counter = 0;
     
     // if one or more records were not put, retry them
@@ -58,24 +58,25 @@ class kinesis_producer {
       Aws::Vector<Aws::Kinesis::Model::PutRecordsRequestEntry> failedRecordsList;
       Aws::Vector<Aws::Kinesis::Model::PutRecordsResultEntry> putRecordsResultEntryList = putRecordsResult.GetResult().GetRecords();
       for (unsigned int i = 0; i < putRecordsResultEntryList.size(); i++) {
-        Aws::Kinesis::Model::PutRecordsRequestEntry putRecordRequestEntry = putRecordsRequestEntryList[i];
+        Aws::Kinesis::Model::PutRecordsRequestEntry putRecordRequestEntry = m_putRecordsRequestEntryList[i];
         Aws::Kinesis::Model::PutRecordsResultEntry putRecordsResultEntry = putRecordsResultEntryList[i];
         if (putRecordsResultEntry.GetErrorCode().length() > 0)
           failedRecordsList.emplace_back(putRecordRequestEntry);
       }
       m_putRecordsRequestEntryList = failedRecordsList;
+      retry_counter++;
       if (retry_counter > 5) {
         return;
       }
       m_putRecordsRequest.SetRecords(m_putRecordsRequestEntryList);
-      putRecordsResult = m_client.PutRecords(m_putRecordsRequest);
+      putRecordsResult = m_client->PutRecords(m_putRecordsRequest);
     }
 
     m_putRecordsRequestEntryList.clear();
   }
 
   int kinesis_destory() {
-    while (m_putRecordsRequestEntryList.size()) {
+    while (m_putRecordsRequestEntryList.size() > 0) {
       kinesis_commit();
     }
     delete m_client;
