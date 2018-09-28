@@ -385,9 +385,7 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
         string transaction_metadata_json =
             "{\"block_number\":" + std::to_string(t.block_number) + ",\"block_time\":" + std::to_string(time) +
             ",\"trace\":" + fc::json::to_string(t.trace).c_str() + "}";
-       producer->kinesis_sendmsg(APPLIED_TRANSACTION,
-                                 (unsigned char*)transaction_metadata_json.c_str(),
-                                 transaction_metadata_json.length());
+       producer->kinesis_sendmsg(transaction_metadata_json);
 
     }
 
