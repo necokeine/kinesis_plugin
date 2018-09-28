@@ -11,8 +11,6 @@
 #include <string>
 
 namespace eosio {
-const char *kSTREAM_NAME = "EOS_Asia_Kinesis";
-const char *kREGION_NAME = "ap-northeast-1";
 
 class kinesis_producer {
  public:
@@ -25,12 +23,39 @@ class kinesis_producer {
     Aws::Client::ClientConfiguration clientConfig;
     // set your region
     clientConfig.region = Aws::Utils::HashingUtils::HashString(region_name);
-    m_regionName = stream_name;
     m_client = new Aws::Kinesis::KinesisClient(clientConfig);
+    m_putRecordsRequest.SetStreamName(stream_name);
+    m_counter = 0;
     return 0;
   }
 
-  int kinesis_sendmsg(int trxtype, unsigned char *msgstr, size_t length) {
+  int kinesis_initialize_msg() {
+    Aws::Kinesis::Model::PutRecordsRequest putRecordsRequest;
+    putRecordsRequest.SetStreamName(m_streamName);
+    m_putRecordsRequestEntryList.clear();
+  }
+
+  int kinesis_add_msg(const string& msg) {
+    Aws::Kinesis::Model::PutRecordsRequestEntry putRecordsRequestEntry;
+    Aws::StringStream pk;
+    pk << "pk-" << (m_counter++ % 100);
+    putRecordsRequestEntry.SetPartitionKey(pk.str());
+    Aws::StringStream data;
+    data << msg;
+    Aws::Utils::ByteBuffer bytes((unsigned char*)data.str().c_str(), data.str().length());
+    putRecordsRequestEntry.SetData(bytes);
+    putRecordsRequestEntryList.emplace_back(putRecordsRequestEntry);
+  }
+
+  int kinesis_commit(int trxtype, unsigned char *msgstr, size_t length) {
+
+    
+    Aws::Kinesis::Model::PutRecordsOutcome putRecordsResult = m_client.PutRecords(m_putRecordsRequest);
+
+
+    putRecordsRequest.SetStreamName(m_streamName);
+    putRecordsRequestEntryList.clear();
+
     // trxtype => to different stream.
     Aws::Kinesis::Model::PutRecordRequest request;
     request.SetStreamName(m_streamName);
@@ -54,6 +79,11 @@ class kinesis_producer {
   Aws::SDKOptions m_options;
   Aws::Kinesis::KinesisClient *m_client;
   Aws::String m_streamName;
+
+  Aws::Kinesis::Model::PutRecordsRequest m_putRecordsRequest;
+  Aws::Vector<Aws::Kinesis::Model::PutRecordsRequestEntry> m_putRecordsRequestEntryList;
+
+  uint64_t m_counter;
 };
 
 }  // namespace eosio
