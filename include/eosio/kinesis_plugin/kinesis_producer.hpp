@@ -22,20 +22,15 @@ class kinesis_producer {
 
     Aws::Client::ClientConfiguration clientConfig;
     // set your region
-    clientConfig.region = Aws::Utils::HashingUtils::HashString(region_name);
+    clientConfig.region = Aws::Utils::HashingUtils::HashString(region_name.c_str());
     m_client = new Aws::Kinesis::KinesisClient(clientConfig);
-    m_putRecordsRequest.SetStreamName(stream_name);
+    m_putRecordsRequest.SetStreamName(stream_name.c_str());
+    m_putRecordsRequestEntryList.clear();
     m_counter = 0;
     return 0;
   }
 
-  int kinesis_initialize_msg() {
-    Aws::Kinesis::Model::PutRecordsRequest putRecordsRequest;
-    putRecordsRequest.SetStreamName(m_streamName);
-    m_putRecordsRequestEntryList.clear();
-  }
-
-  int kinesis_add_msg(const string& msg) {
+  int kinesis_add_msg(const std::string& msg) {
     Aws::Kinesis::Model::PutRecordsRequestEntry putRecordsRequestEntry;
     Aws::StringStream pk;
     pk << "pk-" << (m_counter++ % 100);
@@ -44,32 +39,44 @@ class kinesis_producer {
     data << msg;
     Aws::Utils::ByteBuffer bytes((unsigned char*)data.str().c_str(), data.str().length());
     putRecordsRequestEntry.SetData(bytes);
-    putRecordsRequestEntryList.emplace_back(putRecordsRequestEntry);
+    m_putRecordsRequestEntryList.emplace_back(putRecordsRequestEntry);
+
+    if (m_putRecordsRequestEntryList.size > 10) {
+      kinesis_commit();
+    }
   }
 
-  int kinesis_commit(int trxtype, unsigned char *msgstr, size_t length) {
-
-    
+  void kinesis_commit() {
+    m_putRecordsRequest.SetData(m_putRecordsRequestEntryList);
     Aws::Kinesis::Model::PutRecordsOutcome putRecordsResult = m_client.PutRecords(m_putRecordsRequest);
-
-
-    putRecordsRequest.SetStreamName(m_streamName);
-    putRecordsRequestEntryList.clear();
-
-    // trxtype => to different stream.
-    Aws::Kinesis::Model::PutRecordRequest request;
-    request.SetStreamName(m_streamName);
-    Aws::Utils::ByteBuffer data(msgstr, length);
-    request.SetData(data);
-
-    auto result = m_client->PutRecord(request);
-    if (!result.IsSuccess()) {
-      return 1;
+    int retry_counter = 0;
+    
+    // if one or more records were not put, retry them
+    while (putRecordsResult.GetResult().GetFailedRecordCount() > 0) {
+      std::cout << "Some records failed, retrying" << std::endl;
+      Aws::Vector<Aws::Kinesis::Model::PutRecordsRequestEntry> failedRecordsList;
+      Aws::Vector<Aws::Kinesis::Model::PutRecordsResultEntry> putRecordsResultEntryList = putRecordsResult.GetResult().GetRecords();
+      for (unsigned int i = 0; i < putRecordsResultEntryList.size(); i++) {
+        Aws::Kinesis::Model::PutRecordsRequestEntry putRecordRequestEntry = putRecordsRequestEntryList[i];
+        Aws::Kinesis::Model::PutRecordsResultEntry putRecordsResultEntry = putRecordsResultEntryList[i];
+        if (putRecordsResultEntry.GetErrorCode().length() > 0)
+          failedRecordsList.emplace_back(putRecordRequestEntry);
+      }
+      m_putRecordsRequestEntryList = failedRecordsList;
+      if (retry_counter > 5) {
+        return;
+      }
+      m_putRecordsRequest.SetRecords(m_putRecordsRequestEntryList);
+      putRecordsResult = kinesisClient.PutRecords(m_putRecordsRequest);
     }
-    return 0;
+
+    m_putRecordsRequestEntryList.clear();
   }
 
   int kinesis_destory() {
+    while (m_putRecordsRequestEntryList.size()) {
+      kinesis_commit();
+    }
     delete m_client;
     Aws::ShutdownAPI(m_options);
     return 0;
@@ -78,7 +85,6 @@ class kinesis_producer {
  private:
   Aws::SDKOptions m_options;
   Aws::Kinesis::KinesisClient *m_client;
-  Aws::String m_streamName;
 
   Aws::Kinesis::Model::PutRecordsRequest m_putRecordsRequest;
   Aws::Vector<Aws::Kinesis::Model::PutRecordsRequestEntry> m_putRecordsRequestEntryList;
