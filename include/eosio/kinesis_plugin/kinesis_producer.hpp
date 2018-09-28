@@ -67,7 +67,7 @@ class kinesis_producer {
         return;
       }
       m_putRecordsRequest.SetRecords(m_putRecordsRequestEntryList);
-      putRecordsResult = kinesisClient.PutRecords(m_putRecordsRequest);
+      putRecordsResult = m_client.PutRecords(m_putRecordsRequest);
     }
 
     m_putRecordsRequestEntryList.clear();
