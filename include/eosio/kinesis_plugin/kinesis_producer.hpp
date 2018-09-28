@@ -22,6 +22,7 @@ class kinesis_producer {
     Aws::InitAPI(m_options);
 
     Aws::Client::ClientConfiguration clientConfig;
+    std::cout << "Region Name: " << region_name << "; Stream Name: " << stream_name;
     // set your region
     clientConfig.region = Aws::Utils::HashingUtils::HashString(region_name.c_str());
     m_client = new Aws::Kinesis::KinesisClient(clientConfig);
@@ -45,6 +46,7 @@ class kinesis_producer {
     if (m_putRecordsRequestEntryList.size() > 10) {
       kinesis_commit();
     }
+    return 0;
   }
 
   void kinesis_commit() {
