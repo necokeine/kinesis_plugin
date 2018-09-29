@@ -11,6 +11,8 @@
 
 #include <string>
 
+using namespace std;
+
 namespace eosio {
 
 class kinesis_producer {
