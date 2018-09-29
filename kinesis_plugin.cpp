@@ -405,9 +405,11 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
              ilog( "kinesis_db_plugin shutdown in process please be patient this can take a few minutes" );
              done = true;
              condition.notify_one();
-
+             ilog( "kinesis_db_plugin 1" );
              consume_thread.join();
+             ilog( "kinesis_db_plugin 2" );
              producer->kinesis_destory();
+             ilog( "kinesis_db_plugin 3" );
           } catch( std::exception& e ) {
              elog( "Exception on kinesis_plugin shutdown of consume thread: ${e}", ("e", e.what()));
           }
