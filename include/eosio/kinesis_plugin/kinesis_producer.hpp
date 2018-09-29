@@ -67,8 +67,10 @@ class kinesis_producer {
       for (unsigned int i = 0; i < putRecordsResultEntryList.size(); i++) {
         Aws::Kinesis::Model::PutRecordsRequestEntry putRecordRequestEntry = m_putRecordsRequestEntryList[i];
         Aws::Kinesis::Model::PutRecordsResultEntry putRecordsResultEntry = putRecordsResultEntryList[i];
-        if (putRecordsResultEntry.GetErrorCode().length() > 0)
+        if (putRecordsResultEntry.GetErrorCode().length() > 0) {
+          cout << "Error Message: " << putRecordsResultEntry.GetErrorMessage().c_str() << endl;
           failedRecordsList.emplace_back(putRecordRequestEntry);
+        }
       }
       m_putRecordsRequestEntryList = failedRecordsList;
       retry_counter++;
