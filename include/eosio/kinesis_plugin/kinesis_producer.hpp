@@ -33,6 +33,7 @@ class kinesis_producer {
   }
 
   int kinesis_sendmsg(const std::string& msg) {
+    cout << msg << endl;
     Aws::Kinesis::Model::PutRecordsRequestEntry putRecordsRequestEntry;
     Aws::StringStream pk;
     pk << "pk-" << (m_counter++ % 100);
