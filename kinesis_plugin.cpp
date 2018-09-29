@@ -225,13 +225,6 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
         try {
             while (true) {
                 boost::mutex::scoped_lock lock(mtx);
-                while (transaction_metadata_queue.empty() &&
-                       transaction_trace_queue.empty() &&
-                       block_state_queue.empty() &&
-                       irreversible_block_state_queue.empty() &&
-                       !done) {
-                    condition.wait(lock);
-                }
                 // capture for processing
                 size_t transaction_metadata_size = transaction_metadata_queue.size();
                 if (transaction_metadata_size > 0) {
@@ -254,8 +247,6 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
                     irreversible_block_state_process_queue = move(irreversible_block_state_queue);
                     irreversible_block_state_queue.clear();
                 }
-
-                lock.unlock();
 
                 // warn if queue size greater than 75%
                 if (transaction_metadata_size > (queue_size * 0.75) ||
