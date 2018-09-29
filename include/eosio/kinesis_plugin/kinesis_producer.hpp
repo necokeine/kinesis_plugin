@@ -41,7 +41,8 @@ class kinesis_producer {
     pk << "pk-" << (m_counter++ % 100);
     putRecordsRequestEntry.SetPartitionKey(pk.str());
     Aws::StringStream data;
-    data << msg;
+    //data << msg;
+    data << "1, hehe, test, 111";
     Aws::Utils::ByteBuffer bytes((unsigned char*)data.str().c_str(), data.str().length());
     putRecordsRequestEntry.SetData(bytes);
     m_putRecordsRequestEntryList.emplace_back(putRecordsRequestEntry);
