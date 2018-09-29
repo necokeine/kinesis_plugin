@@ -35,7 +35,7 @@ class kinesis_producer {
   }
 
   int kinesis_sendmsg(const std::string& msg) {
-    cout << msg << endl;
+    //cout << msg << endl;
     Aws::Kinesis::Model::PutRecordsRequestEntry putRecordsRequestEntry;
     Aws::StringStream pk;
     pk << "pk-" << (m_counter++ % 100);
@@ -45,6 +45,8 @@ class kinesis_producer {
     Aws::Utils::ByteBuffer bytes((unsigned char*)data.str().c_str(), data.str().length());
     putRecordsRequestEntry.SetData(bytes);
     m_putRecordsRequestEntryList.emplace_back(putRecordsRequestEntry);
+
+    cout << "Current Size:" << m_putRecordsRequestEntryList.size() << endl;
 
     if (m_putRecordsRequestEntryList.size() > 10) {
       kinesis_commit();
@@ -71,7 +73,7 @@ class kinesis_producer {
       m_putRecordsRequestEntryList = failedRecordsList;
       retry_counter++;
       if (retry_counter > 5) {
-        return;
+        //return;
       }
       m_putRecordsRequest.SetRecords(m_putRecordsRequestEntryList);
       putRecordsResult = m_client->PutRecords(m_putRecordsRequest);
