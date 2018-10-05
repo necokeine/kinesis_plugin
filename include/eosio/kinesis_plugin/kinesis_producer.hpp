@@ -26,7 +26,9 @@ class kinesis_producer {
     Aws::Client::ClientConfiguration clientConfig;
     std::cout << "Region Name: " << region_name << "; Stream Name: " << stream_name;
     // set your region
-    clientConfig.region = Aws::Utils::HashingUtils::HashString(region_name.c_str());
+    //clientConfig.region = Aws::Utils::HashingUtils::HashString(region_name.c_str());
+    // We can't use HashString here directly right now, but don't know the suspect.
+    clientConfig.region = Aws::Region::AP_NORTHEAST_1;
     m_client = new Aws::Kinesis::KinesisClient(clientConfig);
     m_putRecordsRequest.SetStreamName(stream_name.c_str());
     m_putRecordsRequestEntryList.clear();
@@ -41,8 +43,8 @@ class kinesis_producer {
     pk << "pk-" << (m_counter++ % 100);
     putRecordsRequestEntry.SetPartitionKey(pk.str());
     Aws::StringStream data;
-    //data << msg;
-    data << "1, hehe, test, 111";
+    data << msg;
+    //data << "1, hehe, test, 111";
     Aws::Utils::ByteBuffer bytes((unsigned char*)data.str().c_str(), data.str().length());
     putRecordsRequestEntry.SetData(bytes);
     m_putRecordsRequestEntryList.emplace_back(putRecordsRequestEntry);
