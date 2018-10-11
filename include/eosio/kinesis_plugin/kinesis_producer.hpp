@@ -49,9 +49,9 @@ class kinesis_producer {
     putRecordsRequestEntry.SetData(bytes);
     m_putRecordsRequestEntryList.emplace_back(putRecordsRequestEntry);
 
-    cout << "Current Size:" << m_putRecordsRequestEntryList.size() << endl;
+    // cout << "Current Size:" << m_putRecordsRequestEntryList.size() << endl;
 
-    if (m_putRecordsRequestEntryList.size() > 10) {
+    if (m_putRecordsRequestEntryList.size() > 1000) {
       kinesis_commit();
     }
     return 0;
