@@ -51,7 +51,7 @@ class kinesis_producer {
 
     // cout << "Current Size:" << m_putRecordsRequestEntryList.size() << endl;
 
-    if (m_putRecordsRequestEntryList.size() > 1000) {
+    if (m_putRecordsRequestEntryList.size() >= 3) {
       kinesis_commit();
     }
     return 0;
