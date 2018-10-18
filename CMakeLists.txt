@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.09)
 
 #if(BUILD_KINESIS_PLUGIN)
   # Locate the aws sdk for c++ package.
