@@ -20,11 +20,12 @@ class kinesis_producer {
   kinesis_producer() {}
 
   int kinesis_init(const std::string& stream_name, const std::string& region_name) {
+	  std::cout << "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH" << std::endl;
     // m_options.loggingOptions.logLevel = Aws::Utils::Logging::LogLevel::Info; // Turn on log.
     Aws::InitAPI(m_options);
 
     Aws::Client::ClientConfiguration clientConfig;
-    std::cout << "Region Name: " << region_name << "; Stream Name: " << stream_name;
+    std::cout << "Region Name: " << region_name << "; Stream Name: " << stream_name << std::endl;
     // set your region
     //clientConfig.region = Aws::Utils::HashingUtils::HashString(region_name.c_str());
     // We can't use HashString here directly right now, but don't know the suspect.
@@ -49,7 +50,7 @@ class kinesis_producer {
     putRecordsRequestEntry.SetData(bytes);
     m_putRecordsRequestEntryList.emplace_back(putRecordsRequestEntry);
 
-    // cout << "Current Size:" << m_putRecordsRequestEntryList.size() << endl;
+    cout << "Current Size:" << m_putRecordsRequestEntryList.size() << endl;
 
     if (m_putRecordsRequestEntryList.size() >= 3) {
       kinesis_commit();
