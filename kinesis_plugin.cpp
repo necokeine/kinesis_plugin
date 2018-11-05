@@ -48,7 +48,7 @@ enum TransactionType {
 static appbase::abstract_plugin& _kinesis_plugin = app().register_plugin<kinesis_plugin>();
 using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
 
-    class kinesis_plugin_impl {
+class kinesis_plugin_impl {
     public:
         kinesis_plugin_impl();
 
@@ -140,26 +140,9 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
     namespace {
 
         template<typename Queue, typename Entry>
-        void queue(boost::mutex &mtx, boost::condition_variable &condition, Queue &queue, const Entry &e,
-                   size_t queue_size) {
-            int sleep_time = 100;
-            size_t last_queue_size = 0;
+        void queue(boost::mutex &mtx, boost::condition_variable &condition, Queue &queue, const Entry &e) {
             boost::mutex::scoped_lock lock(mtx);
-            if (queue.size() > queue_size) {
-                lock.unlock();
-                condition.notify_one();
-                if (last_queue_size < queue.size()) {
-                    sleep_time += 100;
-                } else {
-                    sleep_time -= 100;
-                    if (sleep_time < 0) sleep_time = 100;
-                }
-                last_queue_size = queue.size();
-                boost::this_thread::sleep_for(boost::chrono::milliseconds(sleep_time));
-                lock.lock();
-            }
             queue.emplace_back(e);
-            lock.unlock();
             condition.notify_one();
         }
 
@@ -167,7 +150,7 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
 
     void kinesis_plugin_impl::accepted_transaction(const chain::transaction_metadata_ptr &t) {
         try {
-            queue(mtx, condition, transaction_metadata_queue, t, queue_size);
+            queue(mtx, condition, transaction_metadata_queue, t);
         } catch (fc::exception &e) {
             elog("FC Exception while accepted_transaction ${e}", ("e", e.to_string()));
         } catch (std::exception &e) {
@@ -187,7 +170,7 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
             };
             trasaction_info_st &info_t = transactioninfo;
 
-            queue(mtx, condition, transaction_trace_queue, info_t, queue_size);
+            queue(mtx, condition, transaction_trace_queue, info_t);
         } catch (fc::exception &e) {
             elog("FC Exception while applied_transaction ${e}", ("e", e.to_string()));
         } catch (std::exception &e) {
@@ -199,7 +182,7 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
 
     void kinesis_plugin_impl::applied_irreversible_block(const chain::block_state_ptr &bs) {
         try {
-            queue(mtx, condition, irreversible_block_state_queue, bs, queue_size);
+            queue(mtx, condition, irreversible_block_state_queue, bs);
         } catch (fc::exception &e) {
             elog("FC Exception while applied_irreversible_block ${e}", ("e", e.to_string()));
         } catch (std::exception &e) {
@@ -211,7 +194,7 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
 
     void kinesis_plugin_impl::accepted_block(const chain::block_state_ptr &bs) {
         try {
-            queue(mtx, condition, block_state_queue, bs, queue_size);
+            queue(mtx, condition, block_state_queue, bs);
         } catch (fc::exception &e) {
             elog("FC Exception while accepted_block ${e}", ("e", e.to_string()));
         } catch (std::exception &e) {
@@ -222,38 +205,41 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
     }
 
     void kinesis_plugin_impl::consume_blocks() {
-        try {
-            while (true) {
-                boost::mutex::scoped_lock lock(mtx);
-                // capture for processing
-                size_t transaction_metadata_size = transaction_metadata_queue.size();
-                if (transaction_metadata_size > 0) {
-                    transaction_metadata_process_queue = move(transaction_metadata_queue);
-                    transaction_metadata_queue.clear();
-                }
-                size_t transaction_trace_size = transaction_trace_queue.size();
-                if (transaction_trace_size > 0) {
-                    transaction_trace_process_queue = move(transaction_trace_queue);
-                    transaction_trace_queue.clear();
-                }
+	while (true) {
+            try {
+		size_t transaction_metadata_size, transaction_trace_size, block_state_size, irreversible_block_size;
+		{
+                    boost::mutex::scoped_lock lock(mtx);
+                    // capture for processing
+                    transaction_metadata_size = transaction_metadata_queue.size();
+                    if (transaction_metadata_size > 0) {
+                        transaction_metadata_process_queue = move(transaction_metadata_queue);
+                        transaction_metadata_queue.clear();
+                    }
+                    transaction_trace_size = transaction_trace_queue.size();
+                    if (transaction_trace_size > 0) {
+                        transaction_trace_process_queue = move(transaction_trace_queue);
+                        transaction_trace_queue.clear();
+                    }
 
-                size_t block_state_size = block_state_queue.size();
-                if (block_state_size > 0) {
-                    block_state_process_queue = move(block_state_queue);
-                    block_state_queue.clear();
-                }
-                size_t irreversible_block_size = irreversible_block_state_queue.size();
-                if (irreversible_block_size > 0) {
-                    irreversible_block_state_process_queue = move(irreversible_block_state_queue);
-                    irreversible_block_state_queue.clear();
-                }
+                    block_state_size = block_state_queue.size();
+                    if (block_state_size > 0) {
+                        block_state_process_queue = move(block_state_queue);
+                        block_state_queue.clear();
+                    }
+                    irreversible_block_size = irreversible_block_state_queue.size();
+                    if (irreversible_block_size > 0) {
+                        irreversible_block_state_process_queue = move(irreversible_block_state_queue);
+                        irreversible_block_state_queue.clear();
+                    }
+		}
 
                 // warn if queue size greater than 75%
                 if (transaction_metadata_size > (queue_size * 0.75) ||
                     transaction_trace_size > (queue_size * 0.75) ||
                     block_state_size > (queue_size * 0.75) ||
                     irreversible_block_size > (queue_size * 0.75)) {
-//            wlog("queue size: ${q}", ("q", transaction_metadata_size + transaction_trace_size ));
+	            wlog("queue size: ${q}", ("q", transaction_metadata_size + transaction_trace_size ));
                 } else if (done) {
                     ilog("draining queue, size: ${q}", ("q", transaction_metadata_size + transaction_trace_size));
                 }
@@ -292,15 +278,15 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
                     done) {
                     break;
                 }
-            }
-            ilog("kinesis_plugin consume thread shutdown gracefully");
-        } catch (fc::exception &e) {
-            elog("FC Exception while consuming block ${e}", ("e", e.to_string()));
-        } catch (std::exception &e) {
-            elog("STD Exception while consuming block ${e}", ("e", e.what()));
-        } catch (...) {
-            elog("Unknown exception while consuming block");
-        }
+	    } catch (fc::exception &e) {
+	        elog("FC Exception while consuming block ${e}", ("e", e.to_string()));
+	    } catch (std::exception &e) {
+	        elog("STD Exception while consuming block ${e}", ("e", e.what()));
+	    } catch (...) {
+	        elog("Unknown exception while consuming block");
+	    }
+	}
+        ilog("kinesis_plugin consume thread shutdown gracefully");
     }
 
 
@@ -381,9 +367,11 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
     }
 
     void kinesis_plugin_impl::_process_accepted_block( const chain::block_state_ptr& bs ) {
+	//dlog(fc::json::to_string(bs));
     }
 
     void kinesis_plugin_impl::_process_irreversible_block(const chain::block_state_ptr& bs) {
+	//dlog(fc::json::to_string(bs));
     }
 
     kinesis_plugin_impl::kinesis_plugin_impl()
@@ -395,12 +383,9 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
           try {
              ilog( "kinesis_db_plugin shutdown in process please be patient this can take a few minutes" );
              done = true;
-             condition.notify_one();
-             ilog( "kinesis_db_plugin 1" );
+             condition.notify_all();
              consume_thread.join();
-             ilog( "kinesis_db_plugin 2" );
              producer->kinesis_destory();
-             ilog( "kinesis_db_plugin 3" );
           } catch( std::exception& e ) {
              elog( "Exception on kinesis_plugin shutdown of consume thread: ${e}", ("e", e.what()));
           }
@@ -431,7 +416,7 @@ using kinesis_producer_ptr = std::shared_ptr<class kinesis_producer>;
                  "AWS region name in string, e.g. 'ap-northeast-1'")
                 ("aws-stream-name", bpo::value<std::string>(),
                  "The stream name for AWS kinesis.")
-                ("kinesis-block-start", bpo::value<uint32_t>()->default_value(256),
+                ("kinesis-block-start", bpo::value<uint32_t>()->default_value(0),
                  "If specified then only abi data pushed to kinesis until specified block is reached.")
 
                  ;

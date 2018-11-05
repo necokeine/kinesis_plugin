@@ -20,7 +20,6 @@ class kinesis_producer {
   kinesis_producer() {}
 
   int kinesis_init(const std::string& stream_name, const std::string& region_name) {
-	  std::cout << "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH" << std::endl;
     // m_options.loggingOptions.logLevel = Aws::Utils::Logging::LogLevel::Info; // Turn on log.
     Aws::InitAPI(m_options);
 
@@ -50,9 +49,9 @@ class kinesis_producer {
     putRecordsRequestEntry.SetData(bytes);
     m_putRecordsRequestEntryList.emplace_back(putRecordsRequestEntry);
 
-    cout << "Current Size:" << m_putRecordsRequestEntryList.size() << endl;
+    //cout << "Current Size:" << m_putRecordsRequestEntryList.size() << endl;
 
-    if (m_putRecordsRequestEntryList.size() >= 3) {
+    if (m_putRecordsRequestEntryList.size() >= 10) {
       kinesis_commit();
     }
     return 0;
