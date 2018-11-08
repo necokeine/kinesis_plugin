@@ -138,7 +138,6 @@ class kinesis_plugin_impl {
     const std::string kinesis_plugin_impl::accounts_col = "accounts";
 
     namespace {
-
         template<typename Queue, typename Entry>
         void queue(boost::mutex &mtx, boost::condition_variable &condition, Queue &queue, const Entry &e) {
             boost::mutex::scoped_lock lock(mtx);
@@ -206,9 +205,9 @@ class kinesis_plugin_impl {
 
     void kinesis_plugin_impl::consume_blocks() {
 	while (true) {
-            try {
-		size_t transaction_metadata_size, transaction_trace_size, block_state_size, irreversible_block_size;
-		{
+        try {
+		        size_t transaction_metadata_size, transaction_trace_size, block_state_size, irreversible_block_size;
+                {
                     boost::mutex::scoped_lock lock(mtx);
                     // capture for processing
                     transaction_metadata_size = transaction_metadata_queue.size();
@@ -239,7 +238,7 @@ class kinesis_plugin_impl {
                     transaction_trace_size > (queue_size * 0.75) ||
                     block_state_size > (queue_size * 0.75) ||
                     irreversible_block_size > (queue_size * 0.75)) {
-	            wlog("queue size: ${q}", ("q", transaction_metadata_size + transaction_trace_size ));
+	                wlog("queue size: ${q}", ("q", transaction_metadata_size + transaction_trace_size ));
                 } else if (done) {
                     ilog("draining queue, size: ${q}", ("q", transaction_metadata_size + transaction_trace_size));
                 }
@@ -358,20 +357,27 @@ class kinesis_plugin_impl {
     }
 
     void kinesis_plugin_impl::_process_applied_transaction(const trasaction_info_st &t) {
-       uint64_t time = (t.block_time.time_since_epoch().count()/1000);
+        uint64_t time = (t.block_time.time_since_epoch().count()/1000);
         string transaction_metadata_json =
             "{\"block_number\":" + std::to_string(t.block_number) + ",\"block_time\":" + std::to_string(time) +
             ",\"trace\":" + fc::json::to_string(t.trace).c_str() + "}";
-       producer->kinesis_sendmsg(transaction_metadata_json);
-
+        transaction_metadata_json =
+            "{\"data\":" + transaction_metadata_json + "}";
+        producer->kinesis_sendmsg(transaction_metadata_json);
     }
 
     void kinesis_plugin_impl::_process_accepted_block( const chain::block_state_ptr& bs ) {
-	//dlog(fc::json::to_string(bs));
+	    //dlog(fc::json::to_string(bs));
+        string accepted_block_json = "{\"block_finalized\": false, \"data\": " +
+        fc::json::to_string(bs) + "}";
+        producer->kinesis_sendmsg(accepted_block_json);
     }
 
     void kinesis_plugin_impl::_process_irreversible_block(const chain::block_state_ptr& bs) {
-	//dlog(fc::json::to_string(bs));
+	    //dlog(fc::json::to_string(bs));
+        string irreversiable_block_json = "{\"block_finalized\": true, \"data\": " +
+        fc::json::to_string(bs) + "}";
+        producer->kinesis_sendmsg(irreversiable_block_json);
     }
 
     kinesis_plugin_impl::kinesis_plugin_impl()
