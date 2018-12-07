@@ -6,13 +6,13 @@
 #define KINESIS_PLUGIN_HPP
 
 #include <eosio/chain_plugin/chain_plugin.hpp>
+#include <eosio/chain/account_object.hpp>
 #include <appbase/application.hpp>
 #include <memory>
 #include <string>
 
 namespace eosio {
 
-using kinesis_plugin_impl_ptr = std::shared_ptr<class kinesis_plugin_impl>;
 
 /**
  * Provides persistence to MongoDB for:
@@ -41,7 +41,7 @@ public:
    void plugin_shutdown();
 
 private:
-   kinesis_plugin_impl_ptr my;
+   std::unique_ptr<class kinesis_plugin_impl> my;
 };
 
 }  // namespace eosio

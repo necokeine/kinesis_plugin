@@ -91,27 +91,22 @@ class kinesis_plugin_impl {
 
         void _process_irreversible_block(const chain::block_state_ptr &);
 
-        void init();
-
-        bool configured{false};
+        void init(int thread_number = 32);
 
         uint32_t start_block_num = 0;
         bool start_block_reached = false;
 
         size_t queue_size = 10000;
         std::deque<chain::transaction_metadata_ptr> transaction_metadata_queue;
-        std::deque<chain::transaction_metadata_ptr> transaction_metadata_process_queue;
         std::deque<trasaction_info_st> transaction_trace_queue;
-        std::deque<trasaction_info_st> transaction_trace_process_queue;
         std::deque<chain::block_state_ptr> block_state_queue;
-        std::deque<chain::block_state_ptr> block_state_process_queue;
         std::deque<chain::block_state_ptr> irreversible_block_state_queue;
-        std::deque<chain::block_state_ptr> irreversible_block_state_process_queue;
         boost::mutex mtx;
         boost::condition_variable condition;
-        boost::thread consume_thread;
+        //boost::thread consume_thread;
+        std::vector<std::thread> consume_thread_list;
         boost::atomic<bool> done{false};
-        boost::atomic<bool> startup{true};
+        boost::atomic<bool> startup{false};
         fc::optional<chain::chain_id_type> chain_id;
         fc::microseconds abi_serializer_max_time;
 
@@ -204,87 +199,92 @@ class kinesis_plugin_impl {
     }
 
     void kinesis_plugin_impl::consume_blocks() {
-	while (true) {
-        try {
-		        size_t transaction_metadata_size, transaction_trace_size, block_state_size, irreversible_block_size;
-                {
-                    boost::mutex::scoped_lock lock(mtx);
-                    // capture for processing
-                    transaction_metadata_size = transaction_metadata_queue.size();
-                    if (transaction_metadata_size > 0) {
-                        transaction_metadata_process_queue = move(transaction_metadata_queue);
-                        transaction_metadata_queue.clear();
+        std::deque<chain::transaction_metadata_ptr> transaction_metadata_process_queue;
+        std::deque<trasaction_info_st> transaction_trace_process_queue;
+        std::deque<chain::block_state_ptr> block_state_process_queue;
+        std::deque<chain::block_state_ptr> irreversible_block_state_process_queue;
+
+        while (true) {
+            size_t transaction_metadata_size, transaction_trace_size, block_state_size, irreversible_block_size;
+            try {
+                    {
+                        boost::mutex::scoped_lock lock(mtx);
+                        // capture for processing
+                        transaction_metadata_size = transaction_metadata_queue.size();
+                        if (transaction_metadata_size > 0) {
+                            transaction_metadata_process_queue = move(transaction_metadata_queue);
+                            transaction_metadata_queue.clear();
+                        }
+                        transaction_trace_size = transaction_trace_queue.size();
+                        if (transaction_trace_size > 0) {
+                            transaction_trace_process_queue = move(transaction_trace_queue);
+                            transaction_trace_queue.clear();
+                        }
+
+                        block_state_size = block_state_queue.size();
+                        if (block_state_size > 0) {
+                            block_state_process_queue = move(block_state_queue);
+                            block_state_queue.clear();
+                        }
+                        irreversible_block_size = irreversible_block_state_queue.size();
+                        if (irreversible_block_size > 0) {
+                            irreversible_block_state_process_queue = move(irreversible_block_state_queue);
+                            irreversible_block_state_queue.clear();
+                        }
                     }
-                    transaction_trace_size = transaction_trace_queue.size();
-                    if (transaction_trace_size > 0) {
-                        transaction_trace_process_queue = move(transaction_trace_queue);
-                        transaction_trace_queue.clear();
+
+                    // warn if queue size greater than 75%
+                    if (transaction_metadata_size > (queue_size * 0.75) ||
+                        transaction_trace_size > (queue_size * 0.75) ||
+                        block_state_size > (queue_size * 0.75) ||
+                        irreversible_block_size > (queue_size * 0.75)) {
+                        wlog("queue size: ${q}", ("q", transaction_metadata_size + transaction_trace_size ));
+                    } else if (done) {
+                        ilog("draining queue, size: ${q}", ("q", transaction_metadata_size + transaction_trace_size));
                     }
 
-                    block_state_size = block_state_queue.size();
-                    if (block_state_size > 0) {
-                        block_state_process_queue = move(block_state_queue);
-                        block_state_queue.clear();
+                    // process transactions
+                    while (!transaction_metadata_process_queue.empty()) {
+                        const auto &t = transaction_metadata_process_queue.front();
+                        process_accepted_transaction(t);
+                        transaction_metadata_process_queue.pop_front();
                     }
-                    irreversible_block_size = irreversible_block_state_queue.size();
-                    if (irreversible_block_size > 0) {
-                        irreversible_block_state_process_queue = move(irreversible_block_state_queue);
-                        irreversible_block_state_queue.clear();
+
+                    while (!transaction_trace_process_queue.empty()) {
+                        const auto &t = transaction_trace_process_queue.front();
+                        process_applied_transaction(t);
+                        transaction_trace_process_queue.pop_front();
                     }
-		}
 
-                // warn if queue size greater than 75%
-                if (transaction_metadata_size > (queue_size * 0.75) ||
-                    transaction_trace_size > (queue_size * 0.75) ||
-                    block_state_size > (queue_size * 0.75) ||
-                    irreversible_block_size > (queue_size * 0.75)) {
-	                wlog("queue size: ${q}", ("q", transaction_metadata_size + transaction_trace_size ));
-                } else if (done) {
-                    ilog("draining queue, size: ${q}", ("q", transaction_metadata_size + transaction_trace_size));
-                }
+                    // process blocks
+                    while (!block_state_process_queue.empty()) {
+                        const auto &bs = block_state_process_queue.front();
+                        process_accepted_block(bs);
+                        block_state_process_queue.pop_front();
+                    }
 
-                // process transactions
-                while (!transaction_metadata_process_queue.empty()) {
-                    const auto &t = transaction_metadata_process_queue.front();
-                    process_accepted_transaction(t);
-                    transaction_metadata_process_queue.pop_front();
-                }
+                    // process irreversible blocks
+                    while (!irreversible_block_state_process_queue.empty()) {
+                        const auto &bs = irreversible_block_state_process_queue.front();
+                        process_irreversible_block(bs);
+                        irreversible_block_state_process_queue.pop_front();
+                    }
 
-                while (!transaction_trace_process_queue.empty()) {
-                    const auto &t = transaction_trace_process_queue.front();
-                    process_applied_transaction(t);
-                    transaction_trace_process_queue.pop_front();
-                }
-
-                // process blocks
-                while (!block_state_process_queue.empty()) {
-                    const auto &bs = block_state_process_queue.front();
-                    process_accepted_block(bs);
-                    block_state_process_queue.pop_front();
-                }
-
-                // process irreversible blocks
-                while (!irreversible_block_state_process_queue.empty()) {
-                    const auto &bs = irreversible_block_state_process_queue.front();
-                    process_irreversible_block(bs);
-                    irreversible_block_state_process_queue.pop_front();
-                }
-
-                if (transaction_metadata_size == 0 &&
-                    transaction_trace_size == 0 &&
-                    block_state_size == 0 &&
-                    irreversible_block_size == 0 &&
-                    done) {
-                    break;
-                }
-	    } catch (fc::exception &e) {
-	        elog("FC Exception while consuming block ${e}", ("e", e.to_string()));
-	    } catch (std::exception &e) {
-	        elog("STD Exception while consuming block ${e}", ("e", e.what()));
-	    } catch (...) {
-	        elog("Unknown exception while consuming block");
-	    }
-	}
+                    if (transaction_metadata_size == 0 &&
+                        transaction_trace_size == 0 &&
+                        block_state_size == 0 &&
+                        irreversible_block_size == 0 &&
+                        done) {
+                        break;
+                    }
+            } catch (fc::exception &e) {
+                elog("FC Exception while consuming block ${e}", ("e", e.to_string()));
+            } catch (std::exception &e) {
+                elog("STD Exception while consuming block ${e}", ("e", e.what()));
+            } catch (...) {
+                elog("Unknown exception while consuming block");
+            }
+        }
         ilog("kinesis_plugin consume thread shutdown gracefully");
     }
 
@@ -351,12 +351,14 @@ class kinesis_plugin_impl {
     }
 
     void kinesis_plugin_impl::_process_accepted_transaction(const chain::transaction_metadata_ptr &t) {
+       // Note: accepted transaction do nothing.
        //const auto& trx = t->trx;
        //string trx_json = fc::json::to_string( trx );
        //producer->trx_kinesis_sendmsg(ACCEPTED_TRANSCTION, (unsigned char*)trx_json.c_str(), trx_json.length());
     }
 
     void kinesis_plugin_impl::_process_applied_transaction(const trasaction_info_st &t) {
+        return; // Do nothing on applied transaction.
         uint64_t time = (t.block_time.time_since_epoch().count()/1000);
         string transaction_metadata_json =
             "{\"block_number\":" + std::to_string(t.block_number) + ",\"block_time\":" + std::to_string(time) +
@@ -366,17 +368,64 @@ class kinesis_plugin_impl {
         producer->kinesis_sendmsg(transaction_metadata_json);
     }
 
+    auto make_resolver(controller& db, const fc::microseconds& max_serialization_time) {
+        return [&db, max_serialization_time](const account_name &name) -> optional<abi_serializer> {
+            const auto &d = db.db();
+            const chain::account_object *code_accnt = d.find<chain::account_object, chain::by_name>(name);
+            if (code_accnt != nullptr) {
+                abi_def abi;
+                if (abi_serializer::to_abi(code_accnt->abi, abi)) {
+                    return abi_serializer(abi, max_serialization_time);
+                }
+            }
+            return optional<abi_serializer>();
+        };
+    }
+
     void kinesis_plugin_impl::_process_accepted_block( const chain::block_state_ptr& bs ) {
 	    //dlog(fc::json::to_string(bs));
-        string accepted_block_json = "{\"block_finalized\": false, \"data\": " +
-        fc::json::to_string(bs) + "}";
+        //string accepted_block_json = "{"
+        //    "\"block_number\": ""
+        //string accepted_block_json = "{\"block_finalized\": false, \"data\": " +
+        //    fc::json::to_string(bs) + "}";
+
+        auto block = bs->block;
+
+        fc::variant pretty_output;
+        abi_serializer::to_variant(*block, pretty_output, make_resolver(chain_plug->chain(), abi_serializer_max_time), abi_serializer_max_time);
+        uint32_t ref_block_prefix = block->id()._hash[1];
+        string accepted_block_json = fc::json::to_string(fc::mutable_variant_object(pretty_output.get_object())
+           ("id", block->id())
+           ("block_num", block->block_num())
+           ("ref_block_prefix", ref_block_prefix)
+           ("finalized", false));
+        //string irreversiable_block_json = "{\"block_finalized\": true, \"data\": " + fc::json::to_string(bs) + "}";
         producer->kinesis_sendmsg(accepted_block_json);
     }
 
     void kinesis_plugin_impl::_process_irreversible_block(const chain::block_state_ptr& bs) {
 	    //dlog(fc::json::to_string(bs));
-        string irreversiable_block_json = "{\"block_finalized\": true, \"data\": " +
-        fc::json::to_string(bs) + "}";
+        //const auto block_num = bs->block_num();
+        //const auto block_id_str = bs->id().str();
+        //const auto previous_block_id_str = bs->previous.str();
+        //const auto transaction_mroot_str = bs->transaction_mroot.str();
+        //const auto action_mroot_str = bs->action_mroot.str();
+        //const auto timestamp = std::chrono::seconds{bs->timestamp.operator fc::time_point().sec_since_epoch()}.count();
+        //const auto num_transactions = (int)bs->transactions.size();
+        //const auto producer = bs->producer.to_string();
+        //const auto schedule_version = bs->schedule_version;
+        //const auto confirmed = bs->confirmed;
+
+        auto block = bs->block;
+        fc::variant pretty_output;
+        abi_serializer::to_variant(*block, pretty_output, make_resolver(chain_plug->chain(), abi_serializer_max_time), abi_serializer_max_time);
+        uint32_t ref_block_prefix = block->id()._hash[1];
+        string irreversiable_block_json = fc::json::to_string(fc::mutable_variant_object(pretty_output.get_object())
+           ("id", block->id())
+           ("block_num", block->block_num())
+           ("ref_block_prefix", ref_block_prefix)
+           ("finalized", false));
+        //string irreversiable_block_json = "{\"block_finalized\": true, \"data\": " + fc::json::to_string(bs) + "}";
         producer->kinesis_sendmsg(irreversiable_block_json);
     }
 
@@ -385,12 +434,15 @@ class kinesis_plugin_impl {
     }
 
     kinesis_plugin_impl::~kinesis_plugin_impl() {
-       if (!startup) {
+       if (startup) {
           try {
-             ilog( "kinesis_db_plugin shutdown in process please be patient this can take a few minutes" );
+             ilog( "kinesis_db_plugin shutdown in process please be patient this can take some minutes" );
              done = true;
              condition.notify_all();
-             consume_thread.join();
+             //consume_thread.join();
+             for (auto& thread : consume_thread_list) {
+                 thread.join();
+             }
              producer->kinesis_destory();
           } catch( std::exception& e ) {
              elog( "Exception on kinesis_plugin shutdown of consume thread: ${e}", ("e", e.what()));
@@ -398,11 +450,13 @@ class kinesis_plugin_impl {
        }
     }
 
-    void kinesis_plugin_impl::init() {
-
+    void kinesis_plugin_impl::init(int thread_number) {
         ilog("starting kinesis plugin thread");
-        consume_thread = boost::thread([this] { consume_blocks(); });
-        startup = false;
+        for (int i = 0; i < thread_number; i++) {
+            consume_thread_list.push_back(std::thread([this]{ consume_blocks();}));
+        }
+        //consume_thread = boost::thread([this] { consume_blocks(); });
+        startup = true;
     }
 
 ////////////
@@ -424,7 +478,6 @@ class kinesis_plugin_impl {
                  "The stream name for AWS kinesis.")
                 ("kinesis-block-start", bpo::value<uint32_t>()->default_value(0),
                  "If specified then only abi data pushed to kinesis until specified block is reached.")
-
                  ;
     }
 
@@ -445,13 +498,8 @@ class kinesis_plugin_impl {
                 aws_stream_name = "EOS_Asia_Kinesis";
             }
 
-            if (0!=my->producer->kinesis_init(aws_stream_name, aws_region_name)) {
-                elog("kinesis_init fail");
-            } else {
-                elog("kinesis_init ok");
-            }
+            my->producer->kinesis_init(aws_stream_name, aws_region_name);
             ilog("initializing kinesis_plugin");
-            my->configured = true;
 
             if ( options.count( "kinesis-block-start" )) {
                 my->start_block_num = options.at( "kinesis-block-start" ).as<uint32_t>();
@@ -472,18 +520,18 @@ class kinesis_plugin_impl {
             }));
 
             my->irreversible_block_connection.emplace(
-                    chain.irreversible_block.connect([&](const chain::block_state_ptr &bs) {
-                        my->applied_irreversible_block(bs);
-                    }));
+                chain.irreversible_block.connect([&](const chain::block_state_ptr &bs) {
+                    my->applied_irreversible_block(bs);
+                }));
 
             my->accepted_transaction_connection.emplace(
-                    chain.accepted_transaction.connect([&](const chain::transaction_metadata_ptr &t) {
-                        my->accepted_transaction(t);
-                    }));
+                chain.accepted_transaction.connect([&](const chain::transaction_metadata_ptr &t) {
+                    my->accepted_transaction(t);
+                }));
             my->applied_transaction_connection.emplace(
-                    chain.applied_transaction.connect([&](const chain::transaction_trace_ptr &t) {
-                        my->applied_transaction(t);
-                    }));
+                chain.applied_transaction.connect([&](const chain::transaction_trace_ptr &t) {
+                    my->applied_transaction(t);
+                }));
             my->init();
         }
 
