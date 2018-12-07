@@ -40,8 +40,9 @@ class kinesis_producer {
 
   void kinesis_sendmsg(std::string msg) {
     std::lock_guard<std::mutex> lock(m_mux_produce);
-    m_produce_queue.push_back(std::move(msg));
-    m_cond.notify_one();
+    ilog(msg);
+    //m_produce_queue.push_back(std::move(msg));
+    //m_cond.notify_one();
   }
 
   void kinesis_consumer() {
