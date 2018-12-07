@@ -549,11 +549,13 @@ class kinesis_plugin_impl {
     }
 
     void kinesis_plugin::plugin_shutdown() {
+        ilog("Kinesis_plugin shutdown.");
         my->accepted_block_connection.reset();
         my->irreversible_block_connection.reset();
         my->accepted_transaction_connection.reset();
         my->applied_transaction_connection.reset();
         my.reset();
+        ilog("Kinesis_plugin shutdown successfully.");
     }
 } // namespace eosio
 
