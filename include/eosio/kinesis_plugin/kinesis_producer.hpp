@@ -40,9 +40,8 @@ class kinesis_producer {
 
   void kinesis_sendmsg(std::string msg) {
     std::lock_guard<std::mutex> lock(m_mux_produce);
-    ilog(msg);
-    //m_produce_queue.push_back(std::move(msg));
-    //m_cond.notify_one();
+    m_produce_queue.push_back(std::move(msg));
+    m_cond.notify_one();
   }
 
   void kinesis_consumer() {
@@ -59,7 +58,10 @@ class kinesis_producer {
       putRecordsRequestEntryList.clear();
       std::deque<std::string> elements = get_msg_list();
       if (m_exit && elements.size() == 0) break;
+      ilog("Pushing " + std::to_string(elements.size()) + " blocks.");
       for (const std::string& element : elements) {
+        ilog(element);
+        //continue;
         Aws::Kinesis::Model::PutRecordsRequestEntry putRecordsRequestEntry;
         Aws::StringStream pk;
         pk << "pk-" << (m_counter++ % 1000);
@@ -69,6 +71,7 @@ class kinesis_producer {
         putRecordsRequestEntry.SetData(bytes);
         putRecordsRequestEntryList.push_back(std::move(putRecordsRequestEntry));
       }
+      //continue;
       putRecordsRequest.SetRecords(putRecordsRequestEntryList);
       Aws::Kinesis::Model::PutRecordsOutcome putRecordsResult = client.PutRecords(putRecordsRequest);
     
@@ -88,6 +91,7 @@ class kinesis_producer {
         putRecordsRequest.SetRecords(putRecordsRequestEntryList);
         putRecordsResult = client.PutRecords(putRecordsRequest);
       }
+      ilog("Pushed " + std::to_string(elements.size()) + " blocks.");
     }
   }
 
