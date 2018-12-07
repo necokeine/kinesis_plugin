@@ -60,7 +60,7 @@ class kinesis_producer {
       if (m_exit && elements.size() == 0) break;
       ilog("Pushing " + std::to_string(elements.size()) + " blocks.");
       for (const std::string& element : elements) {
-        ilog(element);
+        //ilog(element);
         Aws::Kinesis::Model::PutRecordsRequestEntry putRecordsRequestEntry;
         Aws::StringStream pk;
         pk << "pk-" << (m_counter++ % 1000);
