@@ -61,7 +61,6 @@ class kinesis_producer {
       ilog("Pushing " + std::to_string(elements.size()) + " blocks.");
       for (const std::string& element : elements) {
         ilog(element);
-        continue;
         Aws::Kinesis::Model::PutRecordsRequestEntry putRecordsRequestEntry;
         Aws::StringStream pk;
         pk << "pk-" << (m_counter++ % 1000);
@@ -71,7 +70,6 @@ class kinesis_producer {
         putRecordsRequestEntry.SetData(bytes);
         putRecordsRequestEntryList.push_back(std::move(putRecordsRequestEntry));
       }
-      continue;
       putRecordsRequest.SetRecords(putRecordsRequestEntryList);
       Aws::Kinesis::Model::PutRecordsOutcome putRecordsResult = client.PutRecords(putRecordsRequest);
     
