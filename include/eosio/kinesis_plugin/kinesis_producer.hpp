@@ -93,6 +93,7 @@ class kinesis_producer {
       }
       ilog("Pushed " + std::to_string(elements.size()) + " blocks.");
     }
+    ilog("Kinesis producer thread finish.");
   }
 
   void kinesis_destory() {
