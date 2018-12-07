@@ -204,11 +204,15 @@ class kinesis_plugin_impl {
         std::deque<chain::block_state_ptr> block_state_process_queue;
         std::deque<chain::block_state_ptr> irreversible_block_state_process_queue;
 
+        ilog("kinesis_plugin analysis thread started");
         while (true) {
             size_t transaction_metadata_size, transaction_trace_size, block_state_size, irreversible_block_size;
             try {
                     {
                         boost::mutex::scoped_lock lock(mtx);
+                        condition.wait(lock, [&]{return done
+                            || !block_state_queue.empty() || !irreversible_block_state_queue.empty()
+                            || !transaction_metadata_queue.empty() || !transaction_trace_queue.empty();});
                         // capture for processing
                         transaction_metadata_size = transaction_metadata_queue.size();
                         if (transaction_metadata_size > 0) {
@@ -434,30 +438,32 @@ class kinesis_plugin_impl {
     }
 
     kinesis_plugin_impl::~kinesis_plugin_impl() {
-       if (startup) {
-          try {
-             ilog( "kinesis_db_plugin shutdown in process please be patient this can take some minutes" );
-             done = true;
-             condition.notify_all();
-             //consume_thread.join();
-             for (auto& thread : consume_thread_list) {
-                 thread.join();
-             }
-             producer->kinesis_destory();
-          } catch( std::exception& e ) {
-             elog( "Exception on kinesis_plugin shutdown of consume thread: ${e}", ("e", e.what()));
-          }
-       }
+        if (startup) {
+            try {
+                ilog( "kinesis_db_plugin shutdown in process please be patient this can take some minutes" );
+                done = true;
+                condition.notify_all();
+                //consume_thread.join();
+                for (auto& thread : consume_thread_list) {
+                    if (thread.joinable()) {
+                        thread.join();
+                    }
+                }
+                producer->kinesis_destory();
+            } catch( std::exception& e ) {
+                elog( "Exception on kinesis_plugin shutdown of consume thread: ${e}", ("e", e.what()));
+            }
+        }
     }
 
     void kinesis_plugin_impl::init(int thread_number) {
         ilog("starting kinesis plugin thread");
         abi_serializer_max_time = fc::seconds(10);
+        startup = true;
         for (int i = 0; i < thread_number; i++) {
             consume_thread_list.push_back(std::thread([this]{ consume_blocks();}));
         }
         //consume_thread = boost::thread([this] { consume_blocks(); });
-        startup = true;
     }
 
 ////////////
