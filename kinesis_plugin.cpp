@@ -452,6 +452,7 @@ class kinesis_plugin_impl {
 
     void kinesis_plugin_impl::init(int thread_number) {
         ilog("starting kinesis plugin thread");
+        abi_serializer_max_time = fc::seconds(10);
         for (int i = 0; i < thread_number; i++) {
             consume_thread_list.push_back(std::thread([this]{ consume_blocks();}));
         }
