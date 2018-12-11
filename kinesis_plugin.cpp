@@ -428,7 +428,7 @@ class kinesis_plugin_impl {
            ("id", block->id())
            ("block_num", block->block_num())
            ("ref_block_prefix", ref_block_prefix)
-           ("finalized", false));
+           ("finalized", true));
         //string irreversiable_block_json = "{\"block_finalized\": true, \"data\": " + fc::json::to_string(bs) + "}";
         producer->kinesis_sendmsg(irreversiable_block_json);
     }
