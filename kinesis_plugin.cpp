@@ -405,6 +405,10 @@ class kinesis_plugin_impl {
            ("finalized", false));
         //string irreversiable_block_json = "{\"block_finalized\": true, \"data\": " + fc::json::to_string(bs) + "}";
         producer->kinesis_sendmsg(accepted_block_json);
+
+        if (block->block_num() % 1000 == 0) {
+            ilog("Accept block " + std::to_string(block->block_num()));
+        }
     }
 
     void kinesis_plugin_impl::_process_irreversible_block(const chain::block_state_ptr& bs) {
@@ -431,6 +435,10 @@ class kinesis_plugin_impl {
            ("finalized", true));
         //string irreversiable_block_json = "{\"block_finalized\": true, \"data\": " + fc::json::to_string(bs) + "}";
         producer->kinesis_sendmsg(irreversiable_block_json);
+
+        if (block->block_num() % 1000 == 0) {
+            ilog("Accept block " + std::to_string(block->block_num()));
+        }
     }
 
     kinesis_plugin_impl::kinesis_plugin_impl()
