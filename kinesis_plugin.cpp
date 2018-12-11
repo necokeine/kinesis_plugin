@@ -437,7 +437,7 @@ class kinesis_plugin_impl {
         producer->kinesis_sendmsg(irreversiable_block_json);
 
         if (block->block_num() % 1000 == 0) {
-            ilog("Accept block " + std::to_string(block->block_num()));
+            ilog("Final block " + std::to_string(block->block_num()));
         }
     }
 
