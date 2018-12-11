@@ -58,7 +58,9 @@ class kinesis_producer {
       putRecordsRequestEntryList.clear();
       std::deque<std::string> elements = get_msg_list();
       if (m_exit && elements.size() == 0) break;
-      ilog("Pushing " + std::to_string(elements.size()) + " blocks.");
+      if (elements.size() >= 10) {
+        ilog("Pushing " + std::to_string(elements.size()) + " blocks.");
+      }
       for (const std::string& element : elements) {
         //ilog(element);
         Aws::Kinesis::Model::PutRecordsRequestEntry putRecordsRequestEntry;
@@ -91,7 +93,9 @@ class kinesis_producer {
         putRecordsRequest.SetRecords(putRecordsRequestEntryList);
         putRecordsResult = client.PutRecords(putRecordsRequest);
       }
-      ilog("Pushed " + std::to_string(elements.size()) + " blocks.");
+      if (elements.size() >= 10) {
+        ilog("Pushed " + std::to_string(elements.size()) + " blocks.");
+      }
     }
     ilog("Kinesis producer thread finish.");
   }
