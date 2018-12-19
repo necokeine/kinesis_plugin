@@ -1,5 +1,5 @@
 # EOSIO AWS Kinesis Plugin
-EOSIO Kinesis Plugin
+EOSIO Kinesis Plugin. This is a multithread kinesis pusher for exposing EOS block information.
 
 ## Requirements
 ###  install aws-sdk-cpp
